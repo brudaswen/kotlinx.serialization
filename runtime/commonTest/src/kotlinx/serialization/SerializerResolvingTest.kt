@@ -23,6 +23,20 @@ class SerializerResolvingTest {
     }
 
     @Test
+    fun testPlainInt() {
+        val token = typeOf<Int>()
+        val serial = serializer(token)
+        assertSame(IntSerializer as KSerializer<*>, serial)
+        assertSerializedWithType("42", 42)
+    }
+
+    @Test
+    fun testPlainObject() {
+        val b = StringData("some string")
+        assertSerializedWithType("""{data:"some string"}""", b)
+    }
+
+    @Test
     fun testListWithDtoResolving() {
         val source = """[{"intV":42}]"""
         val serial = serializer<List<IntData>>()
@@ -54,14 +68,14 @@ class SerializerResolvingTest {
     }
 
     @Test
-    fun equalityOfListAndArrayList() {
+    fun testEqualityOfListAndArrayList() {
         val myList = arrayListOf(1, 2, 3)
         assertSerializedWithType<ArrayList<Int>>("[1,2,3]", myList)
         assertSerializedWithType<List<Int>>("[1,2,3]", myList)
     }
 
     @Test
-    fun equalityOfProjectedLists() {
+    fun testEqualityOfProjectedLists() {
         val myList = arrayListOf(1, 2, 3)
         assertSerializedWithType<List<Int>>("[1,2,3]", myList)
         assertSerializedWithType<MutableList<out Int>>("[1,2,3]", myList)
@@ -69,23 +83,33 @@ class SerializerResolvingTest {
     }
 
     @Test
-    fun supportNullableTypes() {
+    fun testSupportNullableTypes() {
         val myList: List<Int?> = listOf(1, null, 3)
         assertSerializedWithType("[1,null,3]", myList)
         assertSerializedWithType<List<Int?>?>("[1,null,3]", myList)
     }
 
     @Test
-    fun objectTest() {
-        val b = StringData("some string")
-        assertSerializedWithType("""{data:"some string"}""", b)
+    fun testCustomGeneric() {
+        val intBox = Box(42)
+        val intBoxSerializer = serializer<Box<Int>>()
+        assertEquals(Box.serializer(IntSerializer).descriptor, intBoxSerializer.descriptor)
+        assertSerializedWithType("""{boxed:42}""", intBox)
+        val dataBox = Box(StringData("foo"))
+        assertSerializedWithType("""{boxed:{data:foo}}""", dataBox)
     }
 
     @Test
-    fun intResolve() {
-        val token = typeOf<Int>()
-        val serial = serializer(token)
-        assertSame(IntSerializer as KSerializer<*>, serial)
-        assertSerializedWithType("42", 42)
+    fun testRecursiveGeneric() {
+        val boxBox = Box(Box(Box(IntData(42))))
+        assertSerializedWithType("""{boxed:{boxed:{boxed:{intV:42}}}}""", boxBox)
+    }
+
+    @Test
+    fun testMixedGeneric() {
+        val listOfBoxes = listOf(Box("foo"), Box("bar"))
+        assertSerializedWithType("""[{boxed:foo},{boxed:bar}]""", listOfBoxes)
+        val boxedList = Box(listOf("foo", "bar"))
+        assertSerializedWithType("""{boxed:[foo,bar]}""", boxedList)
     }
 }
